@@ -1,10 +1,7 @@
 package pl.asie.environmentchecker.tracker;
 
 import com.google.common.base.Joiner;
-import com.google.common.collect.HashMultimap;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Multimap;
-import com.google.common.collect.TreeMultimap;
+import com.google.common.collect.*;
 import net.minecraftforge.fml.common.asm.transformers.deobf.FMLRemappingAdapter;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.commons.RemappingClassAdapter;
@@ -48,14 +45,21 @@ public final class TransformerTracker {
 	}
 
 	private List<String> twoToThree(List<String> old, List<String> neu) {
-		List<String> all = Lists.newArrayList(old);
+		Set<String> all = Sets.newHashSet(old);
 		all.addAll(neu);
 		List<String> old2 = Lists.newArrayList(old);
 		old.removeAll(neu);
 		neu.removeAll(old2);
 		all.removeAll(old);
 		all.removeAll(neu);
-		return all;
+
+		List<String> allList = Lists.newArrayList(all);
+
+		Collections.sort(allList);
+		Collections.sort(neu);
+		Collections.sort(old);
+
+		return allList;
 	}
 
 	public void add(String transformerId, String oldClassName, String className, byte[] dataOld, byte[] dataNew) {
@@ -65,8 +69,8 @@ public final class TransformerTracker {
 		ClassNode nodeOld = new ClassNode();
 		ClassNode nodeNew = new ClassNode();
 
-		readerOld.accept(new FMLRemappingAdapter(nodeOld), 8);
-		readerNew.accept(new FMLRemappingAdapter(nodeNew), 8);
+		readerOld.accept(new FMLRemappingAdapter(nodeOld), ClassReader.SKIP_FRAMES | ClassReader.SKIP_DEBUG);
+		readerNew.accept(new FMLRemappingAdapter(nodeNew), ClassReader.SKIP_FRAMES | ClassReader.SKIP_DEBUG);
 		List<String> fieldNamesOld = new ArrayList<>();
 		List<String> fieldNamesNew = new ArrayList<>();
 		List<String> methodNamesOld = new ArrayList<>();
@@ -136,8 +140,8 @@ public final class TransformerTracker {
 
 	private void saveForced() {
 		try {
-			PrintWriter out = new PrintWriter("coremodTrackedChanges.txt");
-			out.println("Classes changed (by transformer):");
+			PrintWriter out = new PrintWriter("./envcheck/asmTransformerChanges.txt");
+			out.println("===\nClasses changed (by changing transformer):\n===\n");
 			for (String key : changedClassesByMod.keySet()) {
 				out.println("- " + key);
 				for (ClassChangeInfo value : changedClassesByMod.get(key)) {
@@ -147,11 +151,14 @@ public final class TransformerTracker {
 					}
 				}
 			}
-			out.println("\nClasses changed (by class):");
+			out.println("\n\n===\nClasses changed (by changed class):\n===\n");
 			for (String key : changedClassesByClass.keySet()) {
 				out.println("- " + key);
 				for (ClassChangeInfo value : changedClassesByClass.get(key)) {
 					out.println("\t- " + value.modName);
+					for (String value2 : value.subData) {
+						out.println("\t\t- " + value2);
+					}
 				}
 			}
 

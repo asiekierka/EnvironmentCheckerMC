@@ -25,6 +25,7 @@
  */
 package pl.asie.environmentchecker;
 
+import java.io.File;
 import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Map;
@@ -62,6 +63,11 @@ public class EnvCheckCore implements IFMLLoadingPlugin, IFMLCallHook {
 
     @Override
     public Void call() throws Exception {
+        File file = new File("envcheck");
+        if (!file.exists()) {
+            file.mkdir();
+        }
+
         LaunchClassLoader classLoader = (LaunchClassLoader) getClass().getClassLoader();
 
         // Not so simple!
