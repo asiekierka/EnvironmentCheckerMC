@@ -15,15 +15,19 @@ public class TrackingClassTransformerWrapper implements IClassTransformer {
 			className = className.substring("$wrapper.".length());
 		}
 		this.id = className;
+		TransformerTracker.INSTANCE.transformers.add(id);
 	}
 
 	@Override
 	public byte[] transform(String name, String transformedName, byte[] data) {
 		byte[] dataOld = data.clone();
+		long timeOld = System.nanoTime();
 		byte[] dataNew = parent.transform(name, transformedName, data);
+		long time = System.nanoTime() - timeOld;
+		TransformerTracker.INSTANCE.timeUsedByMod.adjustOrPutValue(id, time, time);
 		if (!Arrays.equals(dataOld, dataNew)) {
 			try {
-				TransformerTracker.INSTANCE.add(id, name, transformedName, dataOld, dataNew);
+				TransformerTracker.INSTANCE.add(id, name, transformedName, dataOld, dataNew, time);
 			} catch (Exception e) {
 				e.printStackTrace();
 			}

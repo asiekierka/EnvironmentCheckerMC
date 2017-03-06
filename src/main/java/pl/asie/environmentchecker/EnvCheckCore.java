@@ -32,17 +32,24 @@ import java.util.Map;
 
 import net.minecraft.launchwrapper.IClassTransformer;
 import net.minecraft.launchwrapper.LaunchClassLoader;
+import net.minecraftforge.common.config.Configuration;
 import net.minecraftforge.fml.common.asm.ASMTransformerWrapper;
 import net.minecraftforge.fml.relauncher.IFMLCallHook;
 import net.minecraftforge.fml.relauncher.IFMLLoadingPlugin;
 import net.minecraftforge.fml.relauncher.ReflectionHelper;
 import pl.asie.environmentchecker.tracker.TrackingClassTransformerWrapper;
+import pl.asie.environmentchecker.tracker.TransformerRewrapper;
 
 @IFMLLoadingPlugin.Name("I don't touch any classes please leave me alone ;_;")
 @IFMLLoadingPlugin.SortingIndex(Integer.MAX_VALUE)
+@IFMLLoadingPlugin.TransformerExclusions("pl.asie.environmentchecker")
 public class EnvCheckCore implements IFMLLoadingPlugin, IFMLCallHook {
+    private static boolean showForgeTransformers = false;
+
     public String[] getASMTransformerClass() {
-        return new String[] { };
+        return new String[] {
+                "pl.asie.environmentchecker.tracker.TransformerRewrapper"
+        };
     }
     
     public String getModContainerClass() {
@@ -61,14 +68,8 @@ public class EnvCheckCore implements IFMLLoadingPlugin, IFMLCallHook {
         return null;
     }
 
-    @Override
-    public Void call() throws Exception {
-        File file = new File("envcheck");
-        if (!file.exists()) {
-            file.mkdir();
-        }
-
-        LaunchClassLoader classLoader = (LaunchClassLoader) getClass().getClassLoader();
+    public static void wrapTransformers() throws IllegalAccessException {
+        LaunchClassLoader classLoader = (LaunchClassLoader) EnvCheckCore.class.getClassLoader();
 
         // Not so simple!
         Field transformersField = ReflectionHelper.findField(LaunchClassLoader.class, "transformers");
@@ -81,12 +82,33 @@ public class EnvCheckCore implements IFMLLoadingPlugin, IFMLCallHook {
                 Field parentTransformerField = ReflectionHelper.findField(ASMTransformerWrapper.TransformerWrapper.class, "parent");
                 parentTransformer = (IClassTransformer) parentTransformerField.get(transformer);
             }
-            if (parentTransformer == null
-                    || parentTransformer.getClass().getName().startsWith("net.minecraftforge")) {
+
+            if (parentTransformer == null || parentTransformer instanceof TrackingClassTransformerWrapper
+                    || parentTransformer instanceof TransformerRewrapper)
                 continue;
+
+            if (!showForgeTransformers) {
+                if (parentTransformer.getClass().getName().startsWith("net.minecraftforge")
+                        || parentTransformer.getClass().getName().startsWith("cpw.mods.fml") /* 1.7 compat */) {
+                    continue;
+                }
             }
             transformerList.set(i, new TrackingClassTransformerWrapper(transformer));
         }
+    }
+
+    @Override
+    public Void call() throws Exception {
+        File file = new File("envcheck");
+        if (!file.exists()) {
+            file.mkdir();
+        }
+
+        Configuration config = new Configuration(new File(new File("config"), "envcheck.cfg"));
+        showForgeTransformers = config.getBoolean("showForgeTransformers", "asmTransformerChanges", false, "Whether or not to show the changes done by Forge's own transformers.");;
+        config.save();
+
+        wrapTransformers();
 
         return null;
     }

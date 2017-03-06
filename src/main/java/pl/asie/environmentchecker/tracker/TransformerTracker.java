@@ -2,6 +2,8 @@ package pl.asie.environmentchecker.tracker;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.*;
+import gnu.trove.map.TObjectLongMap;
+import gnu.trove.map.hash.TObjectLongHashMap;
 import net.minecraftforge.fml.common.asm.transformers.deobf.FMLRemappingAdapter;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.commons.RemappingClassAdapter;
@@ -11,27 +13,34 @@ import org.objectweb.asm.tree.MethodNode;
 import pl.asie.environmentchecker.ASMUtil;
 
 import java.io.PrintWriter;
+import java.text.DecimalFormat;
+import java.text.NumberFormat;
 import java.util.*;
 
 public final class TransformerTracker {
 	public static class ClassChangeInfo {
 		public final String modName, className;
 		public final List<String> subData;
+		public final long timeUsed;
 
-		public ClassChangeInfo(String modName, String className) {
+		public ClassChangeInfo(String modName, String className, long timeUsed) {
 			this.modName = modName;
 			this.className = className;
 			this.subData = new ArrayList<>();
+			this.timeUsed = timeUsed;
 		}
 	}
 
 	public static final TransformerTracker INSTANCE = new TransformerTracker();
 	private static final Joiner commaJoiner = Joiner.on(", ");
+	private static final NumberFormat timeFormat = new DecimalFormat("#.###");
 
+	public Set<String> transformers = new HashSet<>();
 	public Multimap<String, ClassChangeInfo> changedClassesByMod = TreeMultimap.create(
 			Comparator.naturalOrder(),
 			Comparator.comparing(classChangeInfo -> classChangeInfo.className)
 	);
+	public TObjectLongMap<String> timeUsedByMod = new TObjectLongHashMap<>();
 	public Multimap<String, ClassChangeInfo> changedClassesByClass = TreeMultimap.create(
 			Comparator.naturalOrder(),
 			Comparator.comparing(classChangeInfo -> classChangeInfo.modName)
@@ -62,7 +71,7 @@ public final class TransformerTracker {
 		return allList;
 	}
 
-	public void add(String transformerId, String oldClassName, String className, byte[] dataOld, byte[] dataNew) {
+	public void add(String transformerId, String oldClassName, String className, byte[] dataOld, byte[] dataNew, long timeUsed) {
 		ClassReader readerOld = new ClassReader(dataOld);
 		ClassReader readerNew = new ClassReader(dataNew);
 
@@ -99,7 +108,7 @@ public final class TransformerTracker {
 		List<String> fieldNames = twoToThree(fieldNamesOld, fieldNamesNew);
 		List<String> methodNames = twoToThree(methodNamesOld, methodNamesNew);
 
-		ClassChangeInfo info = new ClassChangeInfo(transformerId, className);
+		ClassChangeInfo info = new ClassChangeInfo(transformerId, className, timeUsed);
 
 		for (String s : fieldNamesOld) {
 			info.subData.add("Field DEL: " + s.replace('\n', ' '));
@@ -138,16 +147,23 @@ public final class TransformerTracker {
 		}
 	}
 
+	private String timeToString(long time) {
+		double timeMs = time / 1000000.0;
+		return timeFormat.format(timeMs) + " ms";
+	}
+
 	private void saveForced() {
 		try {
 			PrintWriter out = new PrintWriter("./envcheck/asmTransformerChanges.txt");
 			out.println("===\nClasses changed (by changing transformer):\n===\n");
-			for (String key : changedClassesByMod.keySet()) {
-				out.println("- " + key);
-				for (ClassChangeInfo value : changedClassesByMod.get(key)) {
-					out.println("\t- " + value.className);
-					for (String value2 : value.subData) {
-						out.println("\t\t- " + value2);
+			for (String key : transformers) {
+				out.println("- " + key + " (" + timeToString(timeUsedByMod.get(key)) + ")");
+				if (changedClassesByMod.containsKey(key)) {
+					for (ClassChangeInfo value : changedClassesByMod.get(key)) {
+						out.println("\t- " + value.className + " (" + timeToString(value.timeUsed) + ")");
+						for (String value2 : value.subData) {
+							out.println("\t\t- " + value2);
+						}
 					}
 				}
 			}
