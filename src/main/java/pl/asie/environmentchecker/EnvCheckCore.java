@@ -47,9 +47,7 @@ public class EnvCheckCore implements IFMLLoadingPlugin, IFMLCallHook {
     private static boolean showForgeTransformers = false;
 
     public String[] getASMTransformerClass() {
-        return new String[] {
-                "pl.asie.environmentchecker.tracker.TransformerRewrapper"
-        };
+        return new String[] {};
     }
     
     public String getModContainerClass() {
