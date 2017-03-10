@@ -20,7 +20,7 @@ public class TrackingClassTransformerWrapper implements IClassTransformer {
 
 	@Override
 	public byte[] transform(String name, String transformedName, byte[] data) {
-		byte[] dataOld = data.clone();
+		byte[] dataOld = data == null ? null : data.clone();
 		long timeOld = System.nanoTime();
 		byte[] dataNew = parent.transform(name, transformedName, data);
 		long time = System.nanoTime() - timeOld;

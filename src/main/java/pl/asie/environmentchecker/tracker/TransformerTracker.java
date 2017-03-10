@@ -72,6 +72,9 @@ public final class TransformerTracker {
 	}
 
 	public void add(String transformerId, String oldClassName, String className, byte[] dataOld, byte[] dataNew, long timeUsed) {
+		if (dataOld == null || dataNew == null) // TODO: handle me?
+			return;
+
 		ClassReader readerOld = new ClassReader(dataOld);
 		ClassReader readerNew = new ClassReader(dataNew);
 
